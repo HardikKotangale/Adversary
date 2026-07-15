@@ -1,8 +1,6 @@
-interface HeroSectionProps {
-  onStartArena: () => void;
-}
+import Link from "next/link";
 
-export function HeroSection({ onStartArena }: HeroSectionProps) {
+export function HeroSection() {
   return (
     <section className="px-6 py-20 sm:py-32 text-center max-w-4xl mx-auto relative overflow-hidden">
       {/* Dynamic Background Glows */}
@@ -11,22 +9,22 @@ export function HeroSection({ onStartArena }: HeroSectionProps) {
       <p className="font-mono text-xs tracking-[0.3em] uppercase text-ink-soft opacity-80 mb-6 bg-paper-raised/60 border border-rule px-4 py-1.5 rounded-full inline-block">
         Qwen Cloud × Alibaba Cloud — Agent Society Hackathon
       </p>
-      
+
       <h2 className="font-sans font-extrabold text-5xl sm:text-7xl text-ink tracking-tight leading-[1.05] max-w-3xl mx-auto">
         A panel that <span className="bg-clip-text text-transparent bg-gradient-to-r from-vc via-mediator to-engineer">genuinely disagrees</span>.
       </h2>
-      
+
       <p className="text-lg sm:text-xl text-ink-soft max-w-2xl mx-auto mt-8 leading-relaxed font-sans">
         Adversary puts your pitch in front of a VC, an engineer, and a customer with deeply competing incentives — then lets them debate and rebut each other in real-time. No sugar-coated feedback. Just raw, unfiltered stress-testing.
       </p>
-      
+
       <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
-        <button
-          onClick={onStartArena}
+        <Link
+          href="/arena"
           className="px-8 py-4 rounded-xl bg-mediator hover:brightness-110 text-paper font-mono text-sm uppercase tracking-wider shadow-lg shadow-mediator/25 hover:shadow-mediator/40 hover:scale-[1.02] transition-all font-bold"
         >
           Launch Stress-Test Arena →
-        </button>
+        </Link>
         <a
           href="#how-it-works"
           className="px-6 py-4 rounded-xl border border-rule hover:border-ink-soft text-ink-soft hover:text-ink font-mono text-sm uppercase tracking-wider transition-all"

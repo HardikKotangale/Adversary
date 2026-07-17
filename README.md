@@ -86,20 +86,37 @@ for the tool implementations.
 
 ## Architecture
 
-```
-┌─────────────┐      SSE (fetch + ReadableStream)      ┌─────────────┐
-│   Next.js    │ ─────────────────────────────────────▶ │   Express    │
-│  (frontend)  │ ◀───────────────────────────────────── │  (backend)   │
-└─────────────┘                                          └──────┬───────┘
-                                                                  │
-                                        ┌─────────────────────────┼─────────────────────────┐
-                                        ▼                         ▼                         ▼
-                                ┌───────────────┐        ┌────────────────┐        ┌────────────────┐
-                                │  Qwen Cloud    │        │ Alibaba Cloud   │        │ Alibaba Cloud  │
-                                │ (DashScope,    │        │ RDS PostgreSQL  │        │ OSS            │
-                                │ OpenAI-compat) │        │ (debate record) │        │ (transcript     │
-                                └───────────────┘        └────────────────┘        │  JSON export)  │
-                                                                                     └────────────────┘
+```mermaid
+flowchart TB
+    User(["User's Browser"])
+
+    subgraph ECS["Alibaba Cloud ECS instance — Docker Compose"]
+        direction TB
+        Nginx["nginx :80\nreverse proxy"]
+        Frontend["Next.js frontend\n'/' landing + '/arena' debate tool"]
+        Backend["Express backend\nOrchestrator engine"]
+        Nginx -->|"/ , /arena, static assets"| Frontend
+        Nginx -->|"/api/* (SSE, long-lived)"| Backend
+    end
+
+    subgraph Qwen["Qwen Cloud — DashScope, OpenAI-compatible endpoint"]
+        direction TB
+        PersonaModel["qwen3.7-plus\npersona turns, Orchestrator decisions"]
+        MediatorModel["qwen3.7-max\nMediator's final verdict"]
+    end
+
+    subgraph AlibabaManaged["Alibaba Cloud managed services"]
+        direction TB
+        RDS[("RDS for PostgreSQL\ndebates: turns, verdict, transcript_url")]
+        OSS[("OSS bucket\ntranscript JSON export")]
+    end
+
+    User -- HTTPS --> Nginx
+    Frontend -- "fetch + SSE stream" --> Backend
+    Backend -- "chat.completions.create()" --> PersonaModel
+    Backend -- "chat.completions.create()" --> MediatorModel
+    Backend -- "INSERT / UPDATE" --> RDS
+    Backend -- "ali-oss client.put()" --> OSS
 ```
 
 The frontend has two real routes: `/` is the landing page, `/arena` is the

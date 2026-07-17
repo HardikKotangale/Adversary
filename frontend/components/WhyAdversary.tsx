@@ -6,14 +6,14 @@ const FEATURES = [
     glowColor: "rgba(255, 46, 147, 0.15)",
   },
   {
-    title: "It rebuts, not just reacts",
-    body: "Round 2 forces every panelist to read what the others said and respond — agree, disagree, or add nuance. That's what makes it a debate, not three monologues stapled together.",
+    title: "An Orchestrator decides, not a script",
+    body: "After every turn, an agent reads the live transcript and decides who speaks next, when to call in a specialist, and when the cross-examination is finished — a real decision, not a hardcoded round count. Personas can also call a calculator or re-search the pitch text via real tool calls before responding.",
     color: "var(--engineer)",
     glowColor: "rgba(0, 245, 255, 0.15)",
   },
   {
     title: "Witnesses who read the room",
-    body: "A classifier reads your pitch and suggests specific experts — a HIPAA officer for patient data, a financial regulator for lending — each justified by a phrase actually in your pitch, not a generic category match.",
+    body: "The Orchestrator can summon any of 18 domain specialists mid-debate — a HIPAA officer for patient data, a financial regulator for lending — grounded in what's actually been said in the live transcript, not a pre-computed list from the initial pitch alone.",
     color: "var(--extra)",
     glowColor: "rgba(181, 23, 158, 0.15)",
   },

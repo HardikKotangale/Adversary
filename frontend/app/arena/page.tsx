@@ -5,6 +5,7 @@ import { PitchForm } from "@/components/PitchForm";
 import { EmptyState } from "@/components/EmptyState";
 import { TurnCard } from "@/components/TurnCard";
 import { OrchestratorNote } from "@/components/OrchestratorNote";
+import { DebateSummary } from "@/components/DebateSummary";
 import { VerdictStamp } from "@/components/VerdictStamp";
 import { RoundLabel } from "@/components/RoundLabel";
 import { SkeletonCard } from "@/components/SkeletonCard";
@@ -263,6 +264,13 @@ export default function ArenaPage() {
   const round1Pending = Math.max(0, CORE_PERSONAS.length - openingsReceived);
   const genesisDone = round1Pending === 0;
   const awaitingVerdict = isRunning && genesisDone && pendingSpeakers.length === 0 && !verdict;
+  const turnCount = feed.filter((f) => f.kind === "turn").length;
+  const summons = feed
+    .filter((f): f is Extract<FeedItem, { kind: "summon" }> => f.kind === "summon")
+    .map((f) => ({ roleName: f.roleName, reasoning: f.reasoning }));
+  const concludeReasoning = feed
+    .filter((f): f is Extract<FeedItem, { kind: "orchestrator" }> => f.kind === "orchestrator")
+    .find((f) => f.decision.action === "conclude")?.decision.reasoning;
 
   return (
     <div className="flex-1 flex flex-col">
@@ -409,9 +417,17 @@ export default function ArenaPage() {
           )}
 
           {verdict && (
-            <section className="border-t border-rule pt-6">
-              <RoundLabel>The Verdict</RoundLabel>
-              <VerdictStamp verdict={verdict} />
+            <section className="border-t border-rule pt-6 flex flex-col gap-6">
+              <DebateSummary
+                turnCount={turnCount}
+                panelistCount={activePersonas.size}
+                summons={summons}
+                concludeReasoning={concludeReasoning}
+              />
+              <div>
+                <RoundLabel>The Verdict</RoundLabel>
+                <VerdictStamp verdict={verdict} />
+              </div>
             </section>
           )}
         </div>

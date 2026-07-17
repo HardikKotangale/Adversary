@@ -7,12 +7,12 @@ const STEPS = [
   {
     n: "02",
     title: "Opening Statements",
-    body: "VC, Engineer, and Customer analyze your pitch independently from their unique points of view, streaming their responses instantly.",
+    body: "VC, Engineer, and Customer react to the raw pitch independently and in parallel, streaming in as each finishes.",
   },
   {
     n: "03",
-    title: "Rebuttals & Witnesses",
-    body: "Each panelist reads the openings of the others and cross-examines. Bring in up to 2 domain-expert AI witnesses to dive deeper.",
+    title: "The Orchestrator Takes Over",
+    body: "After every turn, an agent reads the live transcript and decides what happens next — who rebuts whom, when to summon a specialist witness, when the cross-examination is actually done. Nothing about the debate's length or shape is scripted.",
   },
   {
     n: "04",

@@ -1,5 +1,6 @@
 import { Turn } from "@/lib/types";
 import { PersonaBadge } from "./PersonaBadge";
+import { SpeakButton } from "./SpeakButton";
 
 const COLOR_CLASSES: Record<
   string,
@@ -44,11 +45,14 @@ export function TurnCard({
             </span>
           )}
         </div>
-        <span
-          className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider ${colors.bg} ${colors.text} rounded-full shrink-0 font-semibold border border-white/5`}
-        >
-          {KIND_LABEL[turn.kind]}
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <SpeakButton text={turn.content} />
+          <span
+            className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider ${colors.bg} ${colors.text} rounded-full font-semibold border border-white/5`}
+          >
+            {KIND_LABEL[turn.kind]}
+          </span>
+        </div>
       </header>
       <p className="text-base leading-relaxed text-ink-soft whitespace-pre-wrap">{turn.content}</p>
       {turn.toolCalls && turn.toolCalls.length > 0 && (

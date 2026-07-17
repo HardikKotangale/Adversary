@@ -72,6 +72,7 @@ function buildVerdict(pitch: string): Verdict {
   const opener = firstSentence(pitch);
   return {
     score: 5,
+    scoreRationale: `A real wedge and validated demand pull the score up; unproven defensibility against a fast-following incumbent pulls it back down to the middle.`,
     strongestPoint: `There's a real, specific wedge here — "${opener}" describes a concrete user and moment of pain, not a vague category play.`,
     weakestPoint: `Defensibility is unproven. Nothing in the pitch or the panel's exchange shows why this survives an incumbent shipping the same thing as a feature, or why a customer wouldn't churn back to their current workaround.`,
     biggestRisk: `An incumbent with distribution already in place bundles this exact feature for free before this reaches meaningful scale.`,

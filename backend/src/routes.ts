@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { startSSE, sendEvent } from "./sse.js";
-import { runDebate, runAddRole, RoleInput } from "./debateService.js";
+import { runDebate, runAddRole } from "./debateService.js";
+import type { RoleInput } from "./types.js";
 
 export const router = Router();
 

@@ -1,17 +1,10 @@
 // Shared types describing the Adversary API surface.
-// Phase 1: implemented by lib/mockApi.ts
-// Phase 2: implemented by real fetch() calls against the Express backend,
-// with SSE events matching the DebateEvent union below.
+// Mirrors backend/src/types.ts — the SSE event union below matches what the
+// Express backend actually emits from its Orchestrator-driven debate engine.
 
-export type CorePersonaId = "vc" | "engineer" | "customer";
-export type PersonaId = CorePersonaId | "mediator" | string;
+export type PersonaId = string;
 
-export type ColorKey =
-  | "vc"
-  | "engineer"
-  | "customer"
-  | "mediator"
-  | "extra";
+export type ColorKey = "vc" | "engineer" | "customer" | "mediator" | "extra";
 
 export interface PersonaMeta {
   id: PersonaId;
@@ -21,21 +14,31 @@ export interface PersonaMeta {
   domain?: string;
 }
 
-export interface SuggestedRole {
-  id: string;
-  roleName: string;
-  tagline: string;
-  domain: string;
-  justification: string;
+export interface ToolCallRecord {
+  name: string;
+  args: Record<string, unknown>;
+  result: string;
 }
 
-export interface RoundEntry {
+export type TurnKind = "opening" | "rebuttal" | "summon_opening";
+
+export interface Turn {
+  turnId: number;
   personaId: PersonaId;
   roleName: string;
   colorKey: ColorKey;
   content: string;
-  /** Set on round 2 / rebuttal entries: which persona this is primarily responding to. */
-  rebuttingId?: PersonaId;
+  kind: TurnKind;
+  respondingToId?: PersonaId;
+  toolCalls?: ToolCallRecord[];
+}
+
+export interface OrchestratorDecision {
+  action: "speak" | "summon" | "conclude";
+  speakerIds: string[];
+  directives?: Record<string, string>;
+  specialistToSummon?: string;
+  reasoning: string;
 }
 
 export interface Verdict {
@@ -46,39 +49,11 @@ export interface Verdict {
   nextStep: string;
 }
 
-export type DebateStatus =
-  | "idle"
-  | "round1"
-  | "round2"
-  | "verdict"
-  | "complete"
-  | "error";
-
-export interface Debate {
-  id: string;
-  pitch: string;
-  status: DebateStatus;
-  round1: RoundEntry[];
-  round2: RoundEntry[];
-  suggestedRoles: SuggestedRole[];
-  addedRoles: PersonaMeta[];
-  verdict: Verdict | null;
-  transcriptUrl?: string;
-  createdAt: string;
-}
-
 export type DebateEvent =
   | { type: "meta"; debateId: string; createdAt: string }
-  | { type: "round1"; entry: RoundEntry }
-  | { type: "suggestions"; roles: SuggestedRole[] }
-  | { type: "round2"; entry: RoundEntry }
-  | { type: "verdict"; verdict: Verdict }
-  | { type: "done"; transcriptUrl: string }
-  | { type: "error"; message: string };
-
-export type AddRoleEvent =
-  | { type: "role_round1"; entry: RoundEntry }
-  | { type: "role_rebuttal"; entry: RoundEntry }
+  | { type: "orchestrator"; decision: OrchestratorDecision }
+  | { type: "turn"; turn: Turn }
+  | { type: "summon"; personaId: string; roleName: string; colorKey: ColorKey; reasoning: string }
   | { type: "verdict"; verdict: Verdict }
   | { type: "done"; transcriptUrl: string }
   | { type: "error"; message: string };

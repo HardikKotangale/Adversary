@@ -1,13 +1,5 @@
 import { CORE_PERSONAS, MEDIATOR, PERSONA_LIBRARY } from "./personas";
-import {
-  AddRoleEvent,
-  DebateEvent,
-  DebateHandle,
-  PersonaMeta,
-  RoundEntry,
-  SuggestedRole,
-  Verdict,
-} from "./types";
+import { DebateEvent, DebateHandle, PersonaMeta, Turn, Verdict } from "./types";
 
 // ---- helpers -----------------------------------------------------------
 
@@ -27,9 +19,7 @@ function firstSentence(pitch: string): string {
 }
 
 /** Schedules a sequence of timed callbacks; returns a cancel function. */
-function scheduleSequence(
-  steps: Array<{ delay: number; run: () => void }>
-): () => void {
+function scheduleSequence(steps: Array<{ delay: number; run: () => void }>): () => void {
   const timers: ReturnType<typeof setTimeout>[] = [];
   let elapsed = 0;
   for (const step of steps) {
@@ -39,9 +29,9 @@ function scheduleSequence(
   return () => timers.forEach(clearTimeout);
 }
 
-// ---- round 1 content templates -----------------------------------------
+// ---- content templates ---------------------------------------------------
 
-function round1Content(personaId: string, pitch: string): string {
+function openingContent(personaId: string, pitch: string): string {
   const frag = pitchFragment(pitch);
   switch (personaId) {
     case "vc":
@@ -55,18 +45,12 @@ function round1Content(personaId: string, pitch: string): string {
   }
 }
 
-function extraRound1Content(role: PersonaMeta, pitch: string): string {
+function extraOpeningContent(role: PersonaMeta, pitch: string): string {
   const frag = pitchFragment(pitch);
   return `From where I sit, "${frag}" is the part that concerns me most. ${role.tagline} — and nothing in this pitch tells me how that gets handled once this leaves a slide deck. I'd want a concrete answer before this moves forward.`;
 }
 
-// ---- round 2 (rebuttal) templates ---------------------------------------
-
-function rebuttalContent(
-  speaker: PersonaMeta,
-  target: RoundEntry,
-  pitch: string
-): string {
+function rebuttalContent(speaker: PersonaMeta, target: Turn, pitch: string): string {
   const frag = pitchFragment(pitch);
   const templates: Record<string, string> = {
     vc: `${target.roleName} is right to flag that, but from a market lens it's survivable if the wedge is narrow enough to defend — the risk is "${frag}" turning into a feature war before there's a moat. I'd still want to see switching costs modeled explicitly.`,
@@ -75,20 +59,14 @@ function rebuttalContent(
   };
   return (
     templates[speaker.id] ??
-    `Responding to ${target.roleName}: ${role_generic(speaker, target, frag)}`
+    `${speaker.tagline} is the lens I'd apply to ${target.roleName}'s point on "${frag}" — it holds up only if the underlying claim is verifiable, and right now it isn't.`
   );
 }
 
-function role_generic(speaker: PersonaMeta, target: RoundEntry, frag: string): string {
-  return `${speaker.tagline} is the lens I'd apply to ${target.roleName}'s point on "${frag}" — it holds up only if the underlying claim is verifiable, and right now it isn't.`;
-}
-
-function extraRebuttalContent(role: PersonaMeta, target: RoundEntry, pitch: string): string {
+function extraRebuttalContent(role: PersonaMeta, target: Turn, pitch: string): string {
   const frag = pitchFragment(pitch);
   return `${target.roleName} raised "${frag}" — fair, but from a ${role.roleName.toLowerCase()} standpoint that's the second-biggest risk, not the first. ${role.tagline}, and that's the piece I'd want resolved before anything else on this list.`;
 }
-
-// ---- verdict --------------------------------------------------------------
 
 function buildVerdict(pitch: string): Verdict {
   const opener = firstSentence(pitch);
@@ -101,7 +79,7 @@ function buildVerdict(pitch: string): Verdict {
   };
 }
 
-// ---- classifier (suggestExtraRoles) ---------------------------------------
+// ---- domain-matching for the simulated Orchestrator summon -----------------
 
 const DOMAIN_KEYWORDS: Record<string, string[]> = {
   healthcare: ["patient", "clinical", "health", "ehr", "phi", "diagnos", "treatment", "provider", "hospital", "clinic"],
@@ -113,154 +91,177 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
   climate_energy: ["energy", "grid", "solar", "carbon", "emission", "battery", "sustainab"],
 };
 
-function computeSuggestions(pitch: string): SuggestedRole[] {
+function pickSpecialist(pitch: string): PersonaMeta | undefined {
   const lower = pitch.toLowerCase();
-  const matchedDomains = Object.entries(DOMAIN_KEYWORDS)
-    .map(([domain, keywords]) => ({
-      domain,
-      hits: keywords.filter((k) => lower.includes(k)),
-    }))
-    .filter((d) => d.hits.length > 0)
-    .sort((a, b) => b.hits.length - a.hits.length);
-
-  const domains = matchedDomains.length > 0 ? matchedDomains : [{ domain: "enterprise_saas", hits: ["default"] }];
-
-  const suggestions: SuggestedRole[] = [];
-  for (const { domain, hits } of domains) {
-    const rolesInDomain = PERSONA_LIBRARY.filter((p) => p.domain === domain);
-    for (const role of rolesInDomain) {
-      if (suggestions.length >= 4) break;
-      const trigger = hits[0] ?? domain;
-      const frag = pitchFragment(pitch);
-      suggestions.push({
-        id: role.id,
-        roleName: role.roleName,
-        tagline: role.tagline,
-        domain,
-        justification: `The pitch mentions "${trigger}" in context of "${frag}" — ${role.tagline.toLowerCase()} is directly at stake here.`,
-      });
-    }
-    if (suggestions.length >= 4) break;
-  }
-  return suggestions.slice(0, Math.max(2, Math.min(4, suggestions.length)));
+  const matchedDomain = Object.entries(DOMAIN_KEYWORDS).find(([, keywords]) =>
+    keywords.some((k) => lower.includes(k))
+  );
+  const domain = matchedDomain?.[0];
+  const role = domain ? PERSONA_LIBRARY.find((p) => p.domain === domain) : PERSONA_LIBRARY[0];
+  return role;
 }
 
-/** Kept for API-shape parity with the real client; runDebate now streams suggestions itself. */
-export async function suggestExtraRoles(pitch: string): Promise<SuggestedRole[]> {
-  return computeSuggestions(pitch);
-}
-
-// ---- runDebate --------------------------------------------------------------
+// ---- runDebate: simulates the Orchestrator-driven loop ---------------------
 
 export function runDebate(pitch: string, onEvent: (e: DebateEvent) => void): DebateHandle {
   const debateId = uid("debate");
   const createdAt = new Date().toISOString();
+  let turnId = 0;
 
-  const round1Entries: RoundEntry[] = CORE_PERSONAS.map((p) => ({
+  const openings: Turn[] = CORE_PERSONAS.map((p) => ({
+    turnId: ++turnId,
     personaId: p.id,
     roleName: p.roleName,
     colorKey: p.colorKey,
-    content: round1Content(p.id, pitch),
+    content: openingContent(p.id, pitch),
+    kind: "opening",
   }));
 
   const steps: Array<{ delay: number; run: () => void }> = [
     { delay: 150, run: () => onEvent({ type: "meta", debateId, createdAt }) },
-    {
-      delay: 900,
-      run: () => onEvent({ type: "suggestions", roles: computeSuggestions(pitch) }),
-    },
   ];
 
-  round1Entries.forEach((entry, i) => {
-    steps.push({
-      delay: i === 0 ? 700 : 1400,
-      run: () => onEvent({ type: "round1", entry }),
-    });
+  openings.forEach((turn, i) => {
+    steps.push({ delay: i === 0 ? 700 : 1400, run: () => onEvent({ type: "turn", turn }) });
   });
 
-  // Round 2: each core persona rebuts the persona whose point differs most —
-  // simple rotation so each targets a different colleague.
-  CORE_PERSONAS.forEach((speaker, i) => {
-    const target = round1Entries[(i + 1) % round1Entries.length];
-    const speakerMeta = CORE_PERSONAS[i];
+  // Simulated Orchestrator round: two core personas rebut each other.
+  steps.push({
+    delay: 1200,
+    run: () =>
+      onEvent({
+        type: "orchestrator",
+        decision: {
+          action: "speak",
+          speakerIds: ["engineer", "vc"],
+          reasoning: "The VC's TAM claim and the Engineer's pipeline concern are the two sharpest open threads.",
+        },
+      }),
+  });
+
+  const rebuttalTargets = [openings[2], openings[0]]; // engineer -> customer, vc -> engineer
+  const rebuttalSpeakers = [CORE_PERSONAS[1], CORE_PERSONAS[0]];
+  const rebuttalTurns: Turn[] = rebuttalSpeakers.map((speaker, i) => ({
+    turnId: ++turnId,
+    personaId: speaker.id,
+    roleName: speaker.roleName,
+    colorKey: speaker.colorKey,
+    content: rebuttalContent(speaker, rebuttalTargets[i], pitch),
+    kind: "rebuttal",
+    respondingToId: rebuttalTargets[i].personaId,
+  }));
+  rebuttalTurns.forEach((turn, i) => {
+    steps.push({ delay: i === 0 ? 1500 : 1300, run: () => onEvent({ type: "turn", turn }) });
+  });
+
+  // Simulated Orchestrator summon of a domain specialist.
+  const specialist = pickSpecialist(pitch);
+  if (specialist) {
     steps.push({
-      delay: 1600,
+      delay: 1200,
       run: () =>
         onEvent({
-          type: "round2",
-          entry: {
-            personaId: speakerMeta.id,
-            roleName: speakerMeta.roleName,
-            colorKey: speakerMeta.colorKey,
-            content: rebuttalContent(speakerMeta, target, pitch),
-            rebuttingId: target.personaId,
+          type: "orchestrator",
+          decision: {
+            action: "summon",
+            speakerIds: [],
+            specialistToSummon: specialist.id,
+            reasoning: `Specific details in the pitch fall squarely into this specialist's domain.`,
           },
         }),
     });
-  });
+    steps.push({
+      delay: 500,
+      run: () =>
+        onEvent({
+          type: "summon",
+          personaId: specialist.id,
+          roleName: specialist.roleName,
+          colorKey: specialist.colorKey,
+          reasoning: `Specific details in the pitch fall squarely into ${specialist.roleName}'s domain.`,
+        }),
+    });
+    steps.push({
+      delay: 1500,
+      run: () =>
+        onEvent({
+          type: "turn",
+          turn: {
+            turnId: ++turnId,
+            personaId: specialist.id,
+            roleName: specialist.roleName,
+            colorKey: specialist.colorKey,
+            content: extraOpeningContent(specialist, pitch),
+            kind: "summon_opening",
+          },
+        }),
+    });
+  }
 
   steps.push({
-    delay: 1800,
-    run: () => onEvent({ type: "verdict", verdict: buildVerdict(pitch) }),
+    delay: 1000,
+    run: () =>
+      onEvent({
+        type: "orchestrator",
+        decision: {
+          action: "conclude",
+          speakerIds: [],
+          reasoning: "The cross-examination has covered the pitch's key risks; further turns would be repetitive.",
+        },
+      }),
   });
 
+  steps.push({ delay: 1800, run: () => onEvent({ type: "verdict", verdict: buildVerdict(pitch) }) });
   steps.push({
     delay: 400,
     run: () =>
-      onEvent({
-        type: "done",
-        transcriptUrl: `https://mock-oss.example.com/transcripts/${debateId}.json`,
-      }),
+      onEvent({ type: "done", transcriptUrl: `https://mock-oss.example.com/transcripts/${debateId}.json` }),
   });
 
   const cancel = scheduleSequence(steps);
   return { cancel };
 }
 
-// ---- addRole --------------------------------------------------------------
+// ---- addRole (manual override) ---------------------------------------------
 
-export function addRole(
-  _debateId: string,
-  role: PersonaMeta,
-  context: { pitch: string; round1: RoundEntry[] },
-  onEvent: (e: AddRoleEvent) => void
-): DebateHandle {
-  const { pitch, round1 } = context;
-
-  const roleEntry: RoundEntry = {
+function runAddRoleMock(role: PersonaMeta, pitch: string, onEvent: (e: DebateEvent) => void): DebateHandle {
+  const openingTurn: Turn = {
+    turnId: Date.now(),
     personaId: role.id,
     roleName: role.roleName,
     colorKey: role.colorKey,
-    content: extraRound1Content(role, pitch),
+    content: extraOpeningContent(role, pitch),
+    kind: "summon_opening",
+  };
+  const rebuttalTurn: Turn = {
+    turnId: Date.now() + 1,
+    personaId: role.id,
+    roleName: role.roleName,
+    colorKey: role.colorKey,
+    content: extraRebuttalContent(role, openingTurn, pitch),
+    kind: "rebuttal",
+    respondingToId: "engineer",
   };
 
-  const strongestExisting =
-    round1.find((e) => e.personaId === "engineer") ?? round1[0];
-
   const steps: Array<{ delay: number; run: () => void }> = [
-    { delay: 700, run: () => onEvent({ type: "role_round1", entry: roleEntry }) },
-    {
-      delay: 1500,
-      run: () =>
-        onEvent({
-          type: "role_rebuttal",
-          entry: {
-            personaId: role.id,
-            roleName: role.roleName,
-            colorKey: role.colorKey,
-            content: extraRebuttalContent(role, strongestExisting, pitch),
-            rebuttingId: strongestExisting.personaId,
-          },
-        }),
-    },
-    { delay: 1400, run: () => onEvent({ type: "verdict", verdict: buildVerdict(pitch) }) },
     {
       delay: 400,
       run: () =>
         onEvent({
-          type: "done",
-          transcriptUrl: `https://mock-oss.example.com/transcripts/${uid("debate")}.json`,
+          type: "summon",
+          personaId: role.id,
+          roleName: role.roleName,
+          colorKey: role.colorKey,
+          reasoning: "Manually called in by the founder.",
         }),
+    },
+    { delay: 700, run: () => onEvent({ type: "turn", turn: openingTurn }) },
+    { delay: 1500, run: () => onEvent({ type: "turn", turn: rebuttalTurn }) },
+    { delay: 1400, run: () => onEvent({ type: "verdict", verdict: buildVerdict(pitch) }) },
+    {
+      delay: 400,
+      run: () =>
+        onEvent({ type: "done", transcriptUrl: `https://mock-oss.example.com/transcripts/${uid("debate")}.json` }),
     },
   ];
 
@@ -268,11 +269,19 @@ export function addRole(
   return { cancel };
 }
 
+export function addRole(_debateId: string, roleId: string, onEvent: (e: DebateEvent) => void): DebateHandle {
+  const role = PERSONA_LIBRARY.find((p) => p.id === roleId);
+  if (!role) {
+    onEvent({ type: "error", message: `Unknown role: ${roleId}` });
+    return { cancel: () => {} };
+  }
+  return runAddRoleMock(role, "the pitch under discussion", onEvent);
+}
+
 export function addCustomRole(
-  debateId: string,
+  _debateId: string,
   input: { roleName: string; description: string },
-  context: { pitch: string; round1: RoundEntry[] },
-  onEvent: (e: AddRoleEvent) => void
+  onEvent: (e: DebateEvent) => void
 ): DebateHandle {
   const meta: PersonaMeta = {
     id: `custom_${uid("role")}`,
@@ -280,7 +289,7 @@ export function addCustomRole(
     tagline: input.description,
     colorKey: "extra",
   };
-  return addRole(debateId, meta, context, onEvent);
+  return runAddRoleMock(meta, "the pitch under discussion", onEvent);
 }
 
 export { MEDIATOR };

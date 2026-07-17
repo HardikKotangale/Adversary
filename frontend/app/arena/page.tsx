@@ -3,9 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PitchForm } from "@/components/PitchForm";
 import { EmptyState } from "@/components/EmptyState";
-import { PersonaCard } from "@/components/PersonaCard";
-import { RebuttalCard } from "@/components/RebuttalCard";
-import { SuggestionCard } from "@/components/SuggestionCard";
+import { TurnCard } from "@/components/TurnCard";
+import { OrchestratorNote } from "@/components/OrchestratorNote";
 import { VerdictStamp } from "@/components/VerdictStamp";
 import { RoundLabel } from "@/components/RoundLabel";
 import { SkeletonCard } from "@/components/SkeletonCard";
@@ -16,37 +15,58 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { CORE_PERSONAS } from "@/lib/personas";
 import * as api from "@/lib/client";
-import {
-  DebateHandle,
-  PersonaMeta,
-  RoundEntry,
-  SuggestedRole,
-  Verdict,
-} from "@/lib/types";
+import { ColorKey, DebateHandle, OrchestratorDecision, PersonaMeta, Turn, Verdict } from "@/lib/types";
 
 const MAX_EXTRA_ROLES = 2;
+const SUMMON_PLACEHOLDER_ID = "__pending_summon__";
 
 type Status = "empty" | "running" | "complete" | "error";
+
+type FeedItem =
+  | { kind: "turn"; key: string; turn: Turn }
+  | { kind: "orchestrator"; key: string; decision: OrchestratorDecision }
+  | {
+      kind: "summon";
+      key: string;
+      personaId: string;
+      roleName: string;
+      colorKey: ColorKey;
+      reasoning: string;
+    };
+
+type PendingSpeaker = { id: string; roleName?: string; colorKey: ColorKey };
+type ActivePersonaInfo = { roleName: string; colorKey: ColorKey };
 
 export default function ArenaPage() {
   const [status, setStatus] = useState<Status>("empty");
   const [pitch, setPitch] = useState("");
   const [draftPitch, setDraftPitch] = useState("");
   const [debateId, setDebateId] = useState<string | null>(null);
-  const [round1, setRound1] = useState<RoundEntry[]>([]);
-  const [round2, setRound2] = useState<RoundEntry[]>([]);
-  const [suggestedRoles, setSuggestedRoles] = useState<SuggestedRole[]>([]);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [addedRoles, setAddedRoles] = useState<PersonaMeta[]>([]);
-  const [addedEntries, setAddedEntries] = useState<RoundEntry[]>([]);
-  const [pendingRoleId, setPendingRoleId] = useState<string | null>(null);
+  const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [activePersonas, setActivePersonas] = useState<Map<string, ActivePersonaInfo>>(new Map());
+  const [pendingSpeakers, setPendingSpeakers] = useState<PendingSpeaker[]>([]);
+  const [concluded, setConcluded] = useState(false);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [finderMode, setFinderMode] = useState<"none" | "search" | "custom">("none");
 
   const handleRef = useRef<DebateHandle | null>(null);
-  const round1Ref = useRef<RoundEntry[]>([]);
+  const feedKeyRef = useRef(0);
+  // Mirrors `activePersonas` synchronously so SSE callbacks (set up once per
+  // debate) can look up fresh persona info without a stale-closure read.
+  const activePersonasRef = useRef<Map<string, ActivePersonaInfo>>(new Map());
+
+  const updateActivePersonas = useCallback(
+    (updater: (prev: Map<string, ActivePersonaInfo>) => Map<string, ActivePersonaInfo>) => {
+      setActivePersonas((prev) => {
+        const next = updater(prev);
+        activePersonasRef.current = next;
+        return next;
+      });
+    },
+    []
+  );
 
   useEffect(() => {
     if (status !== "running") return;
@@ -55,155 +75,194 @@ export default function ArenaPage() {
   }, [status]);
 
   const findRoleName = useCallback(
-    (id: string | undefined) => {
-      if (!id) return undefined;
-      return (
-        round1.find((e) => e.personaId === id)?.roleName ??
-        addedEntries.find((e) => e.personaId === id)?.roleName
-      );
-    },
-    [round1, addedEntries]
+    (id: string | undefined) => (id ? activePersonas.get(id)?.roleName : undefined),
+    [activePersonas]
   );
 
-  const startDebate = useCallback((pitchText: string) => {
-    handleRef.current?.cancel();
-    setStatus("running");
-    setPitch(pitchText);
-    setDraftPitch(pitchText);
-    setRound1([]);
-    setRound2([]);
-    setSuggestedRoles([]);
-    setSuggestionsLoading(true);
-    setAddedRoles([]);
-    setAddedEntries([]);
-    setVerdict(null);
-    setErrorMessage(null);
-    setDebateId(null);
-    setElapsedSeconds(0);
-    setFinderMode("none");
-    round1Ref.current = [];
+  const startDebate = useCallback(
+    (pitchText: string) => {
+      handleRef.current?.cancel();
+      setStatus("running");
+      setPitch(pitchText);
+      setDraftPitch(pitchText);
+      setDebateId(null);
+      setFeed([]);
+      setPendingSpeakers([]);
+      setConcluded(false);
+      updateActivePersonas(() => new Map(CORE_PERSONAS.map((p) => [p.id, { roleName: p.roleName, colorKey: p.colorKey }])));
+      setVerdict(null);
+      setErrorMessage(null);
+      setElapsedSeconds(0);
+      setFinderMode("none");
+      feedKeyRef.current = 0;
 
-    handleRef.current = api.runDebate(pitchText, (event) => {
-      switch (event.type) {
-        case "meta":
-          setDebateId(event.debateId);
-          break;
-        case "suggestions":
-          setSuggestedRoles(event.roles);
-          setSuggestionsLoading(false);
-          break;
-        case "round1":
-          round1Ref.current = [...round1Ref.current, event.entry];
-          setRound1((prev) => [...prev, event.entry]);
-          break;
-        case "round2":
-          setRound2((prev) => [...prev, event.entry]);
-          break;
-        case "verdict":
-          setVerdict(event.verdict);
-          break;
-        case "done":
-          setStatus("complete");
-          break;
-        case "error":
-          setErrorMessage(event.message);
-          setStatus("error");
-          setSuggestionsLoading(false);
-          break;
-      }
-    });
-  }, []);
+      handleRef.current = api.runDebate(pitchText, (event) => {
+        switch (event.type) {
+          case "meta":
+            setDebateId(event.debateId);
+            break;
+          case "turn":
+            setFeed((prev) => [...prev, { kind: "turn", key: `k${feedKeyRef.current++}`, turn: event.turn }]);
+            setPendingSpeakers((prev) => prev.filter((p) => p.id !== event.turn.personaId));
+            break;
+          case "orchestrator": {
+            setFeed((prev) => [
+              ...prev,
+              { kind: "orchestrator", key: `k${feedKeyRef.current++}`, decision: event.decision },
+            ]);
+            if (event.decision.action === "speak") {
+              setPendingSpeakers(
+                event.decision.speakerIds.map((id) => {
+                  const info = activePersonasRef.current.get(id);
+                  return { id, roleName: info?.roleName, colorKey: info?.colorKey ?? "extra" };
+                })
+              );
+            } else if (event.decision.action === "summon") {
+              setPendingSpeakers([{ id: SUMMON_PLACEHOLDER_ID, roleName: undefined, colorKey: "extra" }]);
+            } else {
+              setPendingSpeakers([]);
+              setConcluded(true);
+            }
+            break;
+          }
+          case "summon":
+            updateActivePersonas((prev) => new Map(prev).set(event.personaId, { roleName: event.roleName, colorKey: event.colorKey }));
+            setFeed((prev) => [
+              ...prev,
+              {
+                kind: "summon",
+                key: `k${feedKeyRef.current++}`,
+                personaId: event.personaId,
+                roleName: event.roleName,
+                colorKey: event.colorKey,
+                reasoning: event.reasoning,
+              },
+            ]);
+            setPendingSpeakers((prev) =>
+              prev.map((p) =>
+                p.id === SUMMON_PLACEHOLDER_ID
+                  ? { id: event.personaId, roleName: event.roleName, colorKey: event.colorKey }
+                  : p
+              )
+            );
+            break;
+          case "verdict":
+            setVerdict(event.verdict);
+            setPendingSpeakers([]);
+            break;
+          case "done":
+            setStatus("complete");
+            break;
+          case "error":
+            setErrorMessage(event.message);
+            setStatus("error");
+            setPendingSpeakers([]);
+            break;
+        }
+      });
+    },
+    [updateActivePersonas]
+  );
+
+  const summonedCount = Math.max(0, activePersonas.size - CORE_PERSONAS.length);
 
   const addPersonaToDebate = useCallback(
     (meta: PersonaMeta) => {
-      if (addedRoles.length >= MAX_EXTRA_ROLES || !debateId) return;
-      setAddedRoles((prev) => [...prev, meta]);
-      setSuggestedRoles((prev) => prev.filter((r) => r.id !== meta.id));
-      setPendingRoleId(meta.id);
+      if (summonedCount >= MAX_EXTRA_ROLES || !debateId) return;
+      updateActivePersonas((prev) => new Map(prev).set(meta.id, { roleName: meta.roleName, colorKey: meta.colorKey }));
       setFinderMode("none");
+      setPendingSpeakers([{ id: meta.id, roleName: meta.roleName, colorKey: meta.colorKey }]);
 
-      api.addRole(debateId, meta, { pitch, round1: round1Ref.current }, (event) => {
+      api.addRole(debateId, meta.id, (event) => {
         switch (event.type) {
-          case "role_round1":
-            setAddedEntries((prev) => [...prev, event.entry]);
+          case "summon":
+            setFeed((prev) => [
+              ...prev,
+              {
+                kind: "summon",
+                key: `k${feedKeyRef.current++}`,
+                personaId: event.personaId,
+                roleName: event.roleName,
+                colorKey: event.colorKey,
+                reasoning: event.reasoning,
+              },
+            ]);
             break;
-          case "role_rebuttal":
-            setAddedEntries((prev) => [...prev, event.entry]);
-            setPendingRoleId(null);
+          case "turn":
+            setFeed((prev) => [...prev, { kind: "turn", key: `k${feedKeyRef.current++}`, turn: event.turn }]);
+            // The manual-add flow produces two turns (opening, then rebuttal)
+            // from the same persona — re-arm the pending skeleton after the
+            // first so the wait for the second isn't silently unloading.
+            if (event.turn.kind === "summon_opening") {
+              setPendingSpeakers([{ id: meta.id, roleName: meta.roleName, colorKey: meta.colorKey }]);
+            } else {
+              setPendingSpeakers((prev) => prev.filter((p) => p.id !== meta.id));
+            }
             break;
           case "verdict":
             setVerdict(event.verdict);
+            setPendingSpeakers([]);
             break;
           case "error":
             setErrorMessage(event.message);
-            setPendingRoleId(null);
+            setPendingSpeakers([]);
             break;
         }
       });
     },
-    [addedRoles.length, debateId, pitch]
+    [summonedCount, debateId, updateActivePersonas]
   );
 
-  const handleAddRole = useCallback(
-    (role: SuggestedRole) => {
-      addPersonaToDebate({
-        id: role.id,
-        roleName: role.roleName,
-        tagline: role.tagline,
-        colorKey: "extra",
-        domain: role.domain,
-      });
-    },
-    [addPersonaToDebate]
-  );
-
-  const handleAddFromLibrary = useCallback(
-    (role: PersonaMeta) => addPersonaToDebate(role),
-    [addPersonaToDebate]
-  );
+  const handleAddFromLibrary = useCallback((role: PersonaMeta) => addPersonaToDebate(role), [addPersonaToDebate]);
 
   const handleAddCustomRole = useCallback(
     (input: { roleName: string; description: string }) => {
-      if (addedRoles.length >= MAX_EXTRA_ROLES || !debateId) return;
-      const tempId = `custom_pending_${Date.now()}`;
-      const meta: PersonaMeta = {
-        id: tempId,
-        roleName: input.roleName,
-        tagline: input.description,
-        colorKey: "extra",
-      };
-      setAddedRoles((prev) => [...prev, meta]);
-      setPendingRoleId(tempId);
+      if (summonedCount >= MAX_EXTRA_ROLES || !debateId) return;
       setFinderMode("none");
+      setPendingSpeakers([{ id: SUMMON_PLACEHOLDER_ID, roleName: input.roleName, colorKey: "extra" }]);
 
-      api.addCustomRole(debateId, input, { pitch, round1: round1Ref.current }, (event) => {
+      api.addCustomRole(debateId, input, (event) => {
         switch (event.type) {
-          case "role_round1":
-            setAddedEntries((prev) => [...prev, event.entry]);
+          case "summon":
+            updateActivePersonas((prev) => new Map(prev).set(event.personaId, { roleName: event.roleName, colorKey: event.colorKey }));
+            setFeed((prev) => [
+              ...prev,
+              {
+                kind: "summon",
+                key: `k${feedKeyRef.current++}`,
+                personaId: event.personaId,
+                roleName: event.roleName,
+                colorKey: event.colorKey,
+                reasoning: event.reasoning,
+              },
+            ]);
+            setPendingSpeakers([{ id: event.personaId, roleName: event.roleName, colorKey: event.colorKey }]);
             break;
-          case "role_rebuttal":
-            setAddedEntries((prev) => [...prev, event.entry]);
-            setPendingRoleId(null);
+          case "turn":
+            setFeed((prev) => [...prev, { kind: "turn", key: `k${feedKeyRef.current++}`, turn: event.turn }]);
+            if (event.turn.kind !== "summon_opening") {
+              setPendingSpeakers((prev) => prev.filter((p) => p.id !== event.turn.personaId));
+            }
             break;
           case "verdict":
             setVerdict(event.verdict);
+            setPendingSpeakers([]);
             break;
           case "error":
             setErrorMessage(event.message);
-            setPendingRoleId(null);
+            setPendingSpeakers([]);
             break;
         }
       });
     },
-    [addedRoles.length, debateId, pitch]
+    [summonedCount, debateId, updateActivePersonas]
   );
 
   const isRunning = status === "running";
-  const round1Pending = Math.max(0, CORE_PERSONAS.length - round1.length);
-  const showSuggestions =
-    status !== "empty" &&
-    (suggestionsLoading || suggestedRoles.length > 0) &&
-    addedRoles.length < MAX_EXTRA_ROLES;
+  const openingsReceived = feed.filter((f) => f.kind === "turn" && f.turn.kind === "opening").length;
+  const round1Pending = Math.max(0, CORE_PERSONAS.length - openingsReceived);
+  const genesisDone = round1Pending === 0;
+  const awaitingVerdict = isRunning && genesisDone && pendingSpeakers.length === 0 && !verdict;
 
   return (
     <div className="flex-1 flex flex-col">
@@ -226,12 +285,7 @@ export default function ArenaPage() {
             </div>
           </div>
 
-          <PitchForm
-            value={draftPitch}
-            onChange={setDraftPitch}
-            onSubmit={startDebate}
-            disabled={isRunning}
-          />
+          <PitchForm value={draftPitch} onChange={setDraftPitch} onSubmit={startDebate} disabled={isRunning} />
 
           {status === "empty" && <EmptyState onSelectSample={setDraftPitch} />}
 
@@ -241,67 +295,81 @@ export default function ArenaPage() {
 
           {status !== "empty" && (
             <section className="flex flex-col gap-6">
-              <RoundLabel>Round I — Opening Statements</RoundLabel>
-              {status === "running" && round1Pending > 0 && elapsedSeconds >= 8 && (
+              <RoundLabel>The Cross-Examination</RoundLabel>
+              {isRunning && elapsedSeconds >= 8 && (
                 <p className="font-mono text-xs text-ink-soft opacity-70 -mt-2">
                   Live calls to Qwen Cloud — a response can take up to a minute.
-                  {elapsedSeconds >= 8 && ` (${elapsedSeconds}s elapsed)`}
+                  {` (${elapsedSeconds}s elapsed)`}
                 </p>
               )}
-              <div className="grid gap-6">
-                {round1.map((entry, i) => (
-                  <PersonaCard key={entry.personaId} entry={entry} index={i} />
-                ))}
-                {Array.from({ length: round1Pending }).map((_, i) => (
-                  <SkeletonCard
-                    key={`skeleton-${i}`}
-                    colorKey={CORE_PERSONAS[round1.length + i]?.colorKey ?? "extra"}
-                    roleName={CORE_PERSONAS[round1.length + i]?.roleName}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
 
-          {showSuggestions && (
-            <section className="flex flex-col gap-4 border-t border-rule pt-6">
-              <RoundLabel>Call Additional Witnesses</RoundLabel>
-              <p className="font-mono text-xs text-ink-soft opacity-70 -mt-2">
-                The panel thinks these specialists have something to add — click one to swear
-                them in.
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {suggestedRoles.map((role) => (
-                  <SuggestionCard
-                    key={role.id}
-                    role={role}
-                    onAdd={() => handleAddRole(role)}
-                    disabled={addedRoles.length >= MAX_EXTRA_ROLES}
-                  />
-                ))}
-                {suggestionsLoading &&
-                  Array.from({ length: 2 }).map((_, i) => (
-                    <div
-                      key={`sugg-skel-${i}`}
-                      className="border border-dashed border-extra/30 rounded-xl p-4 animate-pulse bg-paper-raised"
-                    >
-                      <div className="h-3 w-32 bg-rule mb-2 rounded" />
-                      <div className="h-2.5 w-full bg-rule rounded" />
-                    </div>
+              <div className="flex flex-col gap-4">
+                {feed.map((item) => {
+                  if (item.kind === "orchestrator") {
+                    return <OrchestratorNote key={item.key} decision={item.decision} />;
+                  }
+                  if (item.kind === "summon") {
+                    return (
+                      <div
+                        key={item.key}
+                        className="font-mono text-xs uppercase tracking-wider text-extra text-center py-1"
+                      >
+                        ⚖ {item.roleName} called to the stand
+                      </div>
+                    );
+                  }
+                  return (
+                    <TurnCard
+                      key={item.key}
+                      turn={item.turn}
+                      respondingToName={findRoleName(item.turn.respondingToId)}
+                      indent={item.turn.kind === "rebuttal"}
+                    />
+                  );
+                })}
+
+                {isRunning &&
+                  !genesisDone &&
+                  Array.from({ length: round1Pending }).map((_, i) => (
+                    <SkeletonCard
+                      key={`skeleton-${i}`}
+                      colorKey={CORE_PERSONAS[openingsReceived + i]?.colorKey ?? "extra"}
+                      roleName={CORE_PERSONAS[openingsReceived + i]?.roleName}
+                    />
                   ))}
+
+                {isRunning &&
+                  genesisDone &&
+                  pendingSpeakers.map((speaker) => (
+                    <SkeletonCard
+                      key={`pending-${speaker.id}`}
+                      colorKey={speaker.colorKey}
+                      roleName={speaker.roleName ?? "A specialist witness"}
+                    />
+                  ))}
+
+                {awaitingVerdict && (
+                  <div className="flex flex-col items-center gap-2 py-4">
+                    <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-wider text-mediator">
+                      <span className="inline-block w-2.5 h-2.5 rounded-full bg-mediator animate-pulse shadow-md shadow-mediator/50" />
+                      {concluded ? "The Mediator is deliberating…" : "Panel in session — Orchestrator deciding the next move…"}
+                    </div>
+                    <p className="font-mono text-[11px] text-ink-soft opacity-60">
+                      {concluded
+                        ? "The flagship model reasons over the full transcript — this can take a minute or more."
+                        : "Live calls to Qwen Cloud — this can take a moment."}
+                    </p>
+                  </div>
+                )}
               </div>
-              {addedRoles.length > 0 && (
-                <p className="font-mono text-xs text-ink-soft opacity-70">
-                  You can call {MAX_EXTRA_ROLES - addedRoles.length} more witness
-                  {MAX_EXTRA_ROLES - addedRoles.length === 1 ? "" : "es"} to the stand this
-                  session.
-                </p>
-              )}
             </section>
           )}
 
-          {status !== "empty" && addedRoles.length < MAX_EXTRA_ROLES && (
+          {status !== "empty" && summonedCount < MAX_EXTRA_ROLES && debateId && (
             <section className="flex flex-col gap-3 border-t border-rule pt-6">
+              <p className="font-mono text-xs text-ink-soft opacity-70">
+                The Orchestrator can summon specialists on its own — but you can also force one in manually.
+              </p>
               <div className="flex items-center gap-3 flex-wrap">
                 <button
                   type="button"
@@ -329,79 +397,16 @@ export default function ArenaPage() {
 
               {finderMode === "search" && (
                 <RoleLibraryBrowser
-                  excludeIds={[
-                    ...addedRoles.map((r) => r.id),
-                    ...suggestedRoles.map((r) => r.id),
-                  ]}
+                  excludeIds={[...activePersonas.keys()]}
                   onAdd={handleAddFromLibrary}
-                  disabled={addedRoles.length >= MAX_EXTRA_ROLES}
+                  disabled={summonedCount >= MAX_EXTRA_ROLES}
                 />
               )}
               {finderMode === "custom" && (
-                <CustomRoleForm
-                  onAdd={handleAddCustomRole}
-                  disabled={addedRoles.length >= MAX_EXTRA_ROLES}
-                />
+                <CustomRoleForm onAdd={handleAddCustomRole} disabled={summonedCount >= MAX_EXTRA_ROLES} />
               )}
             </section>
           )}
-
-          {round2.length > 0 && (
-            <section className="flex flex-col gap-4 border-t border-rule pt-6">
-              <RoundLabel>Round II — Rebuttals</RoundLabel>
-              <div className="flex flex-col gap-4">
-                {round2.map((entry, i) => (
-                  <RebuttalCard
-                    key={`${entry.personaId}-${i}`}
-                    entry={entry}
-                    targetRoleName={findRoleName(entry.rebuttingId)}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {addedEntries.length > 0 && (
-            <section className="flex flex-col gap-4 border-t border-rule pt-6">
-              <RoundLabel>Additional Witnesses</RoundLabel>
-              <div className="flex flex-col gap-4">
-                {addedEntries.map((entry, i) =>
-                  entry.rebuttingId ? (
-                    <RebuttalCard
-                      key={`added-${entry.personaId}-${i}`}
-                      entry={entry}
-                      targetRoleName={findRoleName(entry.rebuttingId)}
-                    />
-                  ) : (
-                    <PersonaCard key={`added-${entry.personaId}-${i}`} entry={entry} />
-                  )
-                )}
-                {pendingRoleId && (
-                  <SkeletonCard
-                    colorKey="extra"
-                    roleName={addedRoles.find((r) => r.id === pendingRoleId)?.roleName}
-                  />
-                )}
-              </div>
-            </section>
-          )}
-
-          {status === "running" &&
-            !verdict &&
-            round1.length >= CORE_PERSONAS.length &&
-            round2.length >= CORE_PERSONAS.length &&
-            !pendingRoleId && (
-              <section className="flex flex-col items-center gap-2 py-6 border-t border-rule">
-                <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-wider text-mediator">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-mediator animate-pulse shadow-md shadow-mediator/50" />
-                  The Mediator is deliberating…
-                </div>
-                <p className="font-mono text-[11px] text-ink-soft opacity-60">
-                  The flagship model reasons over the full transcript — this step is often the
-                  slowest, sometimes a minute or more.
-                </p>
-              </section>
-            )}
 
           {verdict && (
             <section className="border-t border-rule pt-6">

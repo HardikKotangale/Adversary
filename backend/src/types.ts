@@ -1,19 +1,30 @@
 export type ColorKey = "vc" | "engineer" | "customer" | "mediator" | "extra";
 
-export interface RoundEntry {
+export interface ToolCallRecord {
+  name: string;
+  args: Record<string, unknown>;
+  result: string;
+}
+
+export type TurnKind = "opening" | "rebuttal" | "summon_opening";
+
+export interface Turn {
+  turnId: number;
   personaId: string;
   roleName: string;
   colorKey: ColorKey;
   content: string;
-  rebuttingId?: string;
+  kind: TurnKind;
+  respondingToId?: string;
+  toolCalls?: ToolCallRecord[];
 }
 
-export interface SuggestedRole {
-  id: string;
-  roleName: string;
-  tagline: string;
-  domain: string;
-  justification: string;
+export interface OrchestratorDecision {
+  action: "speak" | "summon" | "conclude";
+  speakerIds: string[];
+  directives?: Record<string, string>;
+  specialistToSummon?: string; // persona library id
+  reasoning: string;
 }
 
 export interface Verdict {
@@ -26,26 +37,22 @@ export interface Verdict {
 
 export type DebateEvent =
   | { type: "meta"; debateId: string; createdAt: string }
-  | { type: "round1"; entry: RoundEntry }
-  | { type: "suggestions"; roles: SuggestedRole[] }
-  | { type: "round2"; entry: RoundEntry }
+  | { type: "orchestrator"; decision: OrchestratorDecision }
+  | { type: "turn"; turn: Turn }
+  | { type: "summon"; personaId: string; roleName: string; colorKey: ColorKey; reasoning: string }
   | { type: "verdict"; verdict: Verdict }
   | { type: "done"; transcriptUrl: string }
   | { type: "error"; message: string };
 
-export type AddRoleEvent =
-  | { type: "role_round1"; entry: RoundEntry }
-  | { type: "role_rebuttal"; entry: RoundEntry }
-  | { type: "verdict"; verdict: Verdict }
-  | { type: "done"; transcriptUrl: string }
-  | { type: "error"; message: string };
+export type RoleInput =
+  | { roleId: string }
+  | { customRoleName: string; customDescription: string };
 
 export interface DebateRecord {
   id: string;
   pitch: string;
-  round1: RoundEntry[];
-  round2: RoundEntry[];
-  addedRoles: RoundEntry[]; // flattened: each added persona's round1 + rebuttal entries
+  turns: Turn[];
+  activePersonaIds: string[];
   verdict: Verdict | null;
   transcriptUrl: string | null;
   createdAt: string;

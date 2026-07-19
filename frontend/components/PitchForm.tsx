@@ -38,7 +38,7 @@ export function PitchForm({
           htmlFor="pitch"
           className="font-mono text-xs uppercase tracking-wider text-ink-soft font-semibold"
         >
-          Exhibit A — Your Pitch Idea
+          Exhibit A: Your Pitch Idea
         </label>
         {voice.isSupported && (
           <div className="flex items-center gap-2">

@@ -38,7 +38,7 @@ export async function runDebate(pitch: string, res: Response): Promise<void> {
   for (const persona of CORE_PERSONAS) memory.addActivePersona(persona);
 
   try {
-    // Genesis step: the core panel always opens — nothing to orchestrate yet
+    // Genesis step: the core panel always opens. Nothing to orchestrate yet
     // with zero transcript, so this one step is deterministic. Every turn
     // after this is a genuine Orchestrator decision.
     await Promise.all(
@@ -88,14 +88,14 @@ export async function runDebate(pitch: string, res: Response): Promise<void> {
 
       if (decision.action === "speak" && decision.speakerIds.length > 0) {
         const speakers = decision.speakerIds.filter((id) => memory.getActivePersona(id));
-        if (speakers.length === 0) break; // orchestrator named unknown ids twice in a row — bail safely
+        if (speakers.length === 0) break; // orchestrator named unknown ids: bail safely
         await Promise.all(
           speakers.map((id) => runTurn(memory, id, "rebuttal", decision.directives?.[id], emit))
         );
         continue;
       }
 
-      // Unrecognized/empty decision — treat as conclude rather than loop forever.
+      // Unrecognized/empty decision: treat as conclude rather than loop forever.
       break;
     }
 

@@ -192,7 +192,7 @@ export default function ArenaPage() {
           case "turn":
             setFeed((prev) => [...prev, { kind: "turn", key: `k${feedKeyRef.current++}`, turn: event.turn }]);
             // The manual-add flow produces two turns (opening, then rebuttal)
-            // from the same persona — re-arm the pending skeleton after the
+            // from the same persona. Re-arm the pending skeleton after the
             // first so the wait for the second isn't silently unloading.
             if (event.turn.kind === "summon_opening") {
               setPendingSpeakers([{ id: meta.id, roleName: meta.roleName, colorKey: meta.colorKey }]);
@@ -306,7 +306,7 @@ export default function ArenaPage() {
               <RoundLabel>The Cross-Examination</RoundLabel>
               {isRunning && elapsedSeconds >= 8 && (
                 <p className="font-mono text-xs text-ink-soft opacity-70 -mt-2">
-                  Live calls to Qwen Cloud — a response can take up to a minute.
+                  Live calls to Qwen Cloud. A response can take up to a minute.
                   {` (${elapsedSeconds}s elapsed)`}
                 </p>
               )}
@@ -360,12 +360,12 @@ export default function ArenaPage() {
                   <div className="flex flex-col items-center gap-2 py-4">
                     <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-wider text-mediator">
                       <span className="inline-block w-2.5 h-2.5 rounded-full bg-mediator animate-pulse shadow-md shadow-mediator/50" />
-                      {concluded ? "The Mediator is deliberating…" : "Panel in session — Orchestrator deciding the next move…"}
+                      {concluded ? "The Mediator is deliberating…" : "Panel in session. Orchestrator deciding the next move…"}
                     </div>
                     <p className="font-mono text-[11px] text-ink-soft opacity-60">
                       {concluded
-                        ? "The flagship model reasons over the full transcript — this can take a minute or more."
-                        : "Live calls to Qwen Cloud — this can take a moment."}
+                        ? "The flagship model reasons over the full transcript. This can take a minute or more."
+                        : "Live calls to Qwen Cloud. This can take a moment."}
                     </p>
                   </div>
                 )}
@@ -376,7 +376,7 @@ export default function ArenaPage() {
           {status !== "empty" && summonedCount < MAX_EXTRA_ROLES && debateId && (
             <section className="flex flex-col gap-3 border-t border-rule pt-6">
               <p className="font-mono text-xs text-ink-soft opacity-70">
-                The Orchestrator can summon specialists on its own — but you can also force one in manually.
+                The Orchestrator can summon specialists on its own, but you can also force one in manually.
               </p>
               <div className="flex items-center gap-3 flex-wrap">
                 <button

@@ -29,7 +29,7 @@ export interface OrchestratorDecision {
 
 export interface Verdict {
   score: number; // 1-10 fundability score
-  scoreRationale: string; // why this specific number — what pulled it up/down
+  scoreRationale: string; // why this specific number: what pulled it up/down
   strongestPoint: string;
   weakestPoint: string;
   biggestRisk: string;

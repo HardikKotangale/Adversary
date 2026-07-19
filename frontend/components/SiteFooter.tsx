@@ -14,7 +14,7 @@ export function SiteFooter() {
           </div>
         </div>
         <p className="font-mono text-[10px] text-ink-soft opacity-50 uppercase tracking-wider">
-          Qwen Cloud × Alibaba Cloud — Agent Society Track
+          Qwen Cloud × Alibaba Cloud · Agent Society Track
         </p>
       </div>
     </footer>

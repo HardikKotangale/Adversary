@@ -3,7 +3,7 @@ import type { Persona } from "./personas.js";
 
 /**
  * The single shared state object every agent call in a debate reads from and
- * writes to — the pitch, the panel of currently-active personas, and the
+ * writes to: the pitch, the panel of currently-active personas, and the
  * ordered transcript of turns taken so far. No agent or LLM call holds any
  * state of its own between calls; this object *is* the debate's memory.
  */

@@ -1,5 +1,5 @@
 // Minimal typing for the Web Speech API (not in the standard DOM lib yet).
-// Supported in Chrome, Edge, Safari; not in Firefox — callers must feature-detect.
+// Supported in Chrome, Edge, Safari; not in Firefox. Callers must feature-detect.
 
 export interface MinimalSpeechRecognitionAlternative {
   transcript: string;

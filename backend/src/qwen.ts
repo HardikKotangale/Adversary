@@ -6,7 +6,7 @@ import type { Persona } from "./personas.js";
 import type { OrchestratorDecision, ToolCallRecord, Verdict } from "./types.js";
 
 // Qwen Cloud (DashScope international) latency is occasionally high, especially
-// for the flagship mediator model — a generous timeout with no retries avoids
+// for the flagship mediator model. A generous timeout with no retries avoids
 // compounding a slow-but-working call into a false failure.
 const client = new OpenAI({
   apiKey: config.qwen.apiKey,
@@ -65,13 +65,13 @@ export async function callPersonaTurn(
   isOpening: boolean
 ): Promise<PersonaTurnResult> {
   const instruction = isOpening
-    ? `This is your opening reaction — there is no prior transcript to respond to. Begin your reply with the line "TARGET: none", then a blank line, then your 3-4 sentence opening.`
-    : `You will be shown the full transcript so far. Write exactly one turn (3-4 sentences) responding to whichever prior turn you find most important — agree, disagree, or add nuance. Begin your reply with a single line "TARGET: persona_id" naming which panelist you are primarily responding to (the bare id shown after "id=", no brackets/quotes), then a blank line, then your turn.`;
+    ? `This is your opening reaction. There is no prior transcript to respond to. Begin your reply with the line "TARGET: none", then a blank line, then your 3-4 sentence opening.`
+    : `You will be shown the full transcript so far. Write exactly one turn (3-4 sentences) responding to whichever prior turn you find most important: agree, disagree, or add nuance. Begin your reply with a single line "TARGET: persona_id" naming which panelist you are primarily responding to (the bare id shown after "id=", no brackets/quotes), then a blank line, then your turn.`;
 
   const messages: ChatCompletionMessageParam[] = [
     {
       role: "system",
-      content: `${persona.systemPrompt}\n\n${instruction} You may call the "calculate" tool to verify arithmetic or "search_pitch" to quote the pitch exactly — use them only when it strengthens a specific point, not gratuitously.`,
+      content: `${persona.systemPrompt}\n\n${instruction} You may call the "calculate" tool to verify arithmetic or "search_pitch" to quote the pitch exactly. Use them only when it strengthens a specific point, not gratuitously.`,
     },
     {
       role: "user",
@@ -135,13 +135,13 @@ export interface OrchestratorInput {
   maxTurns: number;
 }
 
-const ORCHESTRATOR_SYSTEM_PROMPT = `You are the Orchestrator of a multi-agent panel debating a startup pitch. You never speak yourself — you decide what happens next in the debate. Given the pitch, the currently active panelists, the transcript so far, and a roster of specialists you may summon, choose exactly one next action:
+const ORCHESTRATOR_SYSTEM_PROMPT = `You are the Orchestrator of a multi-agent panel debating a startup pitch. You never speak yourself. You decide what happens next in the debate. Given the pitch, the currently active panelists, the transcript so far, and a roster of specialists you may summon, choose exactly one next action:
 
 - "speak": have one or more currently-active panelists take their next turn. List their ids in speakerIds. Optionally give any of them a short one-sentence directive in "directives" (keyed by persona id) telling them what to focus on.
-- "summon": bring in exactly one new specialist from the roster whose expertise is clearly needed based on something SPECIFIC in the pitch or the transcript so far — not a generic category match. Set specialistToSummon to their id.
+- "summon": bring in exactly one new specialist from the roster whose expertise is clearly needed based on something SPECIFIC in the pitch or the transcript so far, not a generic category match. Set specialistToSummon to their id.
 - "conclude": end the debate now because the cross-examination has covered the pitch's key risks and further turns would be repetitive.
 
-Keep the debate efficient — do not summon a specialist unless their expertise is clearly warranted, and conclude once diminishing returns set in (rarely more than 8-10 total turns). Respond with strict JSON only: {"action": "speak"|"summon"|"conclude", "speakerIds": string[], "directives": {"<id>": string}, "specialistToSummon": string|null, "reasoning": "one sentence, shown to the user, explaining this decision"}.`;
+Keep the debate efficient. Do not summon a specialist unless their expertise is clearly warranted, and conclude once diminishing returns set in (rarely more than 8-10 total turns). Respond with strict JSON only: {"action": "speak"|"summon"|"conclude", "speakerIds": string[], "directives": {"<id>": string}, "specialistToSummon": string|null, "reasoning": "one sentence, shown to the user, explaining this decision"}.`;
 
 export async function callOrchestrator(input: OrchestratorInput): Promise<OrchestratorDecision> {
   const userPrompt = `Startup pitch:\n"""${input.pitch}"""\n\nActive panelists:\n${input.activePersonas

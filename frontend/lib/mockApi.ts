@@ -35,37 +35,37 @@ function openingContent(personaId: string, pitch: string): string {
   const frag = pitchFragment(pitch);
   switch (personaId) {
     case "vc":
-      return `Walk me through the actual TAM here, not the category size — "${frag}" tells me the wedge, not the market. Who else is funded in this exact wedge, and what stops an incumbent from shipping this as a feature in two quarters? Show me one number that proves this compounds instead of just growing linearly with sales headcount.`;
+      return `Walk me through the actual TAM here, not the category size. "${frag}" tells me the wedge, not the market. Who else is funded in this exact wedge, and what stops an incumbent from shipping this as a feature in two quarters? Show me one number that proves this compounds instead of just growing linearly with sales headcount.`;
     case "engineer":
       return `The hard part isn't the demo, it's the part you didn't mention: "${frag}" implies a data pipeline, an edge-case taxonomy, and a failure mode you haven't hit yet at scale. What's your plan for the 20% of cases that don't fit the happy path? I'd want to see the architecture before I believed the timeline.`;
     case "customer":
-      return `I already have a way to do this — maybe it's a spreadsheet, maybe it's a person, maybe it's nothing and I just live with the problem. "${frag}" has to be better enough that switching is worth the hassle, not just "better." What do I stop paying for the day I start paying for this?`;
+      return `I already have a way to do this: maybe it's a spreadsheet, maybe it's a person, maybe it's nothing and I just live with the problem. "${frag}" has to be better enough that switching is worth the hassle, not just "better." What do I stop paying for the day I start paying for this?`;
     default:
-      return `Reacting to the pitch: "${frag}" — I need more specifics before I'd trust this claim.`;
+      return `Reacting to the pitch: "${frag}". I need more specifics before I'd trust this claim.`;
   }
 }
 
 function extraOpeningContent(role: PersonaMeta, pitch: string): string {
   const frag = pitchFragment(pitch);
-  return `From where I sit, "${frag}" is the part that concerns me most. ${role.tagline} — and nothing in this pitch tells me how that gets handled once this leaves a slide deck. I'd want a concrete answer before this moves forward.`;
+  return `From where I sit, "${frag}" is the part that concerns me most. ${role.tagline}, and nothing in this pitch tells me how that gets handled once this leaves a slide deck. I'd want a concrete answer before this moves forward.`;
 }
 
 function rebuttalContent(speaker: PersonaMeta, target: Turn, pitch: string): string {
   const frag = pitchFragment(pitch);
   const templates: Record<string, string> = {
-    vc: `${target.roleName} is right to flag that, but from a market lens it's survivable if the wedge is narrow enough to defend — the risk is "${frag}" turning into a feature war before there's a moat. I'd still want to see switching costs modeled explicitly.`,
-    engineer: `${target.roleName}'s point assumes the team has already solved the boring 80%. In practice "${frag}" is where projects like this slip six months — I've seen the estimate double once the edge cases show up in production.`,
-    customer: `Sure, but ${target.roleName} is thinking about this from the business side. I don't care about the moat or the architecture — I care whether "${frag}" saves me time on Tuesday. If it doesn't, none of the rest matters to me.`,
+    vc: `${target.roleName} is right to flag that, but from a market lens it's survivable if the wedge is narrow enough to defend. The risk is "${frag}" turning into a feature war before there's a moat. I'd still want to see switching costs modeled explicitly.`,
+    engineer: `${target.roleName}'s point assumes the team has already solved the boring 80%. In practice "${frag}" is where projects like this slip six months. I've seen the estimate double once the edge cases show up in production.`,
+    customer: `Sure, but ${target.roleName} is thinking about this from the business side. I don't care about the moat or the architecture. I care whether "${frag}" saves me time on Tuesday. If it doesn't, none of the rest matters to me.`,
   };
   return (
     templates[speaker.id] ??
-    `${speaker.tagline} is the lens I'd apply to ${target.roleName}'s point on "${frag}" — it holds up only if the underlying claim is verifiable, and right now it isn't.`
+    `${speaker.tagline} is the lens I'd apply to ${target.roleName}'s point on "${frag}". It holds up only if the underlying claim is verifiable, and right now it isn't.`
   );
 }
 
 function extraRebuttalContent(role: PersonaMeta, target: Turn, pitch: string): string {
   const frag = pitchFragment(pitch);
-  return `${target.roleName} raised "${frag}" — fair, but from a ${role.roleName.toLowerCase()} standpoint that's the second-biggest risk, not the first. ${role.tagline}, and that's the piece I'd want resolved before anything else on this list.`;
+  return `${target.roleName} raised "${frag}". Fair, but from a ${role.roleName.toLowerCase()} standpoint that's the second-biggest risk, not the first. ${role.tagline}, and that's the piece I'd want resolved before anything else on this list.`;
 }
 
 function buildVerdict(pitch: string): Verdict {
@@ -73,10 +73,10 @@ function buildVerdict(pitch: string): Verdict {
   return {
     score: 5,
     scoreRationale: `A real wedge and validated demand pull the score up; unproven defensibility against a fast-following incumbent pulls it back down to the middle.`,
-    strongestPoint: `There's a real, specific wedge here — "${opener}" describes a concrete user and moment of pain, not a vague category play.`,
+    strongestPoint: `There's a real, specific wedge here. "${opener}" describes a concrete user and moment of pain, not a vague category play.`,
     weakestPoint: `Defensibility is unproven. Nothing in the pitch or the panel's exchange shows why this survives an incumbent shipping the same thing as a feature, or why a customer wouldn't churn back to their current workaround.`,
     biggestRisk: `An incumbent with distribution already in place bundles this exact feature for free before this reaches meaningful scale.`,
-    nextStep: `Run five paid pilots with the exact user described in the pitch and measure whether they'd churn if the price doubled — that answer, more than anything else discussed, determines if this is a business or a feature.`,
+    nextStep: `Run five paid pilots with the exact user described in the pitch and measure whether they'd churn if the price doubled. That answer, more than anything else discussed, determines if this is a business or a feature.`,
   };
 }
 

@@ -12,7 +12,7 @@ const STEPS = [
   {
     n: "03",
     title: "The Orchestrator Takes Over",
-    body: "After every turn, an agent reads the live transcript and decides what happens next — who rebuts whom, when to summon a specialist witness, when the cross-examination is actually done. Nothing about the debate's length or shape is scripted.",
+    body: "After every turn, an agent reads the live transcript and decides what happens next: who rebuts whom, when to summon a specialist witness, when the cross-examination is actually done. Nothing about the debate's length or shape is scripted.",
   },
   {
     n: "04",

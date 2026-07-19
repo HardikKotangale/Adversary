@@ -36,7 +36,7 @@ export const AGENT_TOOLS: ChatCompletionTool[] = [
   },
 ];
 
-/** Tiny recursive-descent parser for +,-,*,/,(),numbers — no eval(). */
+/** Tiny recursive-descent parser for +,-,*,/,(),numbers. No eval(). */
 function safeCalculate(expression: string): string {
   const tokens = expression.match(/\d+\.?\d*|[()+\-*/]/g);
   if (!tokens) return "Error: could not parse expression.";

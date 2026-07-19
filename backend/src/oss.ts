@@ -24,7 +24,7 @@ const client: OSS | null = isOssConfigured
 
 /**
  * Uploads a completed debate transcript to OSS as JSON and returns the
- * object's URL. Throws if OSS isn't configured — callers should check
+ * object's URL. Throws if OSS isn't configured. Callers should check
  * `isOssConfigured` (or catch and fall back) rather than call this blindly.
  */
 export async function uploadTranscript(record: DebateRecord): Promise<string> {

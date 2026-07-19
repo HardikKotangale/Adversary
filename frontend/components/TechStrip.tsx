@@ -2,7 +2,7 @@ const ITEMS = [
   {
     label: "qwen3.7-plus",
     role: "Runs the panel",
-    body: "Every VC / Engineer / Customer / witness call — fast and cost-effective enough to run in volume across rounds.",
+    body: "Every VC / Engineer / Customer / witness call. Fast and cost-effective enough to run in volume across rounds.",
   },
   {
     label: "qwen3.7-max",

@@ -60,7 +60,7 @@ export function CustomRoleForm({
           onChange={(e) => setDescription(e.target.value)}
           onBlur={() => setTouched(true)}
           rows={2}
-          placeholder="e.g. Argues they could clone this in a weekend — forces you to defend the moat..."
+          placeholder="e.g. Argues they could clone this in a weekend, forces you to defend the moat..."
           maxLength={DESC_MAX}
           className="w-full resize-none rounded-xl border border-rule bg-paper-raised/40 px-4 py-2.5 text-sm text-ink placeholder:text-ink-soft/40 focus:outline-none focus:border-customer/60 focus:ring-1 focus:ring-customer/60 transition-all"
         />

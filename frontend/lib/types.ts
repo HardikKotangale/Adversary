@@ -1,5 +1,5 @@
 // Shared types describing the Adversary API surface.
-// Mirrors backend/src/types.ts — the SSE event union below matches what the
+// Mirrors backend/src/types.ts. The SSE event union below matches what the
 // Express backend actually emits from its Orchestrator-driven debate engine.
 
 export type PersonaId = string;

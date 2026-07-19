@@ -1,7 +1,7 @@
 # docs/
 
 The architecture diagram is embedded directly in the main
-[README.md](../README.md#architecture) as a Mermaid diagram — GitHub renders
+[README.md](../README.md#architecture) as a Mermaid diagram. GitHub renders
 it inline on the repo page automatically, no exported image needed.
 
 If you'd rather have a static image (e.g. for a slide deck or the demo

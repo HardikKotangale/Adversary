@@ -21,7 +21,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Adversary — stress-test your pitch",
+  title: "Adversary: stress-test your pitch",
   description:
     "Pitch stress-testing against a panel of adversarial AI personas that debate and rebut each other.",
 };

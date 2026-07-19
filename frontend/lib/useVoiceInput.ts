@@ -69,7 +69,7 @@ export function useVoiceInput(onTranscriptChange: (fullText: string) => void) {
         setError(
           event.error === "not-allowed"
             ? "Microphone access was denied."
-            : "Voice input failed — try again or type instead."
+            : "Voice input failed. Try again or type instead."
         );
         setIsListening(false);
       };

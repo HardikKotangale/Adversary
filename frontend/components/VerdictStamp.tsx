@@ -26,7 +26,7 @@ export function VerdictStamp({ verdict }: { verdict: Verdict }) {
         <div className="mb-6 flex items-start justify-between gap-3 pr-24">
           <div>
             <span className="font-mono text-xs tracking-[0.25em] text-mediator uppercase block font-semibold glow-text-mediator">
-              — The Mediator&apos;s Ruling —
+              · The Mediator&apos;s Ruling ·
             </span>
             <h2 className="text-3xl font-extrabold text-ink mt-1">
               Verdict Report

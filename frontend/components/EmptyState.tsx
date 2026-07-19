@@ -22,7 +22,7 @@ const COLOR_WASH: Record<string, string> = {
 const SAMPLE_PITCHES = [
   {
     label: "Healthtech",
-    text: "We're building an AI scribe that sits in on telehealth visits, auto-generates clinical notes from the conversation, and syncs them directly to the patient's EHR — saving clinicians 90 minutes a day of after-hours charting.",
+    text: "We're building an AI scribe that sits in on telehealth visits, auto-generates clinical notes from the conversation, and syncs them directly to the patient's EHR, saving clinicians 90 minutes a day of after-hours charting.",
   },
   {
     label: "Fintech",

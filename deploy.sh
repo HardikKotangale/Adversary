@@ -25,6 +25,9 @@ docker compose build
 echo "==> Starting containers"
 docker compose up -d --remove-orphans
 
+echo "==> Restarting nginx (picks up fresh backend/frontend container IPs)"
+docker compose restart nginx
+
 echo "==> Pruning dangling images"
 docker image prune -f
 
